@@ -1,5 +1,5 @@
 import { ArrowRight } from "lucide-react";
-import { Article } from "@/data/mockData";
+import { Article } from "@/types/article";
 import { formatLocalDate } from "@/utils/date";
 
 export default function NewsCard({ article }: { article: Article }) {
@@ -13,7 +13,8 @@ export default function NewsCard({ article }: { article: Article }) {
       case "Technology": return "text-[#0E7490] dark:text-[#67E8F9]";
       case "Politics": return "text-[#B91C1C] dark:text-[#FCA5A5]";
       case "Sports": return "text-[#B45309] dark:text-[#FCD34D]";
-      case "Health": return "text-[#991B1B] dark:text-[#F87171]";
+      case "Health": return "text-[#E11D48] dark:text-[#FB7185]";
+      case "Geopolitics": return "text-[#6366F1] dark:text-[#818CF8]";
       case "Science": return "text-[#4338CA] dark:text-[#A5B4FC]";
       case "Environment": return "text-[#15803D] dark:text-[#86EFAC]";
       case "Entertainment": return "text-[#9D174D] dark:text-[#F472B6]";

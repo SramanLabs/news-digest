@@ -11,7 +11,38 @@ export default function AIAssistant() {
   const [loading, setLoading] = useState(false);
   const [targetLanguage, setTargetLanguage] = useState("Hindi");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const formatResponse = (text: string) => {
+    if (!text) return null;
+    
+    // Split by newlines
+    const lines = text.split("\n").filter(line => line.trim() !== "");
+    
+    return (
+      <div className="space-y-4">
+        {lines.map((line, idx) => {
+          // Check if line starts with Part of Speech:, Meaning:, or Usage Example:
+          const match = line.match(/^(Part of Speech|Meaning|Usage Example):\s*(.*)/i);
+          if (match) {
+            const [, header, content] = match;
+            return (
+              <div key={idx} className="flex flex-col gap-1 text-sm border-l-2 border-theme-accent/30 pl-3 py-0.5 transition-colors">
+                <span className="font-extrabold text-[10px] uppercase tracking-wider text-theme-accent">{header}</span>
+                <span className="font-semibold text-theme-fg/90 leading-relaxed">{content}</span>
+              </div>
+            );
+          }
+          
+          return (
+            <p key={idx} className="text-sm font-semibold text-theme-fg/80 leading-relaxed">
+              {line}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
 
@@ -20,19 +51,29 @@ export default function AIAssistant() {
     setResponse("");
     setQuery(""); // Clear the input box immediately!
 
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      if (mode === "define") {
-        setResponse(
-          `"${currentQuery}" is a key concept. In a real-world scenario, the AI would provide a comprehensive, MBA-tailored definition and business context for this term here.`
-        );
-      } else {
-        setResponse(
-          `Translation of "${currentQuery}" in ${targetLanguage}: [Mock ${targetLanguage} Translation]. The AI translator would output the exact meaning in your preferred language.`
-        );
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+      let url = `${apiUrl}/api/assistant/define?word=${encodeURIComponent(currentQuery)}`;
+      if (mode === "translate") {
+        url = `${apiUrl}/api/assistant/translate?word=${encodeURIComponent(currentQuery)}&language=${encodeURIComponent(targetLanguage)}`;
       }
-    }, 1200);
+      
+      const res = await fetch(url, {
+        method: "POST"
+      });
+      
+      if (!res.ok) {
+        throw new Error("Failed to fetch response from AI Assistant");
+      }
+      
+      const data = await res.json();
+      setResponse(data.result);
+    } catch (err) {
+      console.error("AI Assistant error:", err);
+      setResponse("Sorry, there was an error processing your request. Please ensure the backend is running and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!isOpen) {
@@ -92,8 +133,8 @@ export default function AIAssistant() {
       {/* Content */}
       <div className="p-5 flex-1 min-h-[200px] flex flex-col justify-end bg-theme-bg/30 transition-colors duration-300">
         {response ? (
-          <div className="bg-theme-border/30 text-theme-fg/90 p-4 rounded-xl text-sm leading-relaxed mb-4 border border-theme-border/50 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {response}
+          <div className="bg-theme-border/30 text-theme-fg/90 p-4 rounded-xl text-sm leading-relaxed mb-4 border border-theme-border/50 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300 max-h-[300px] overflow-y-auto">
+            {formatResponse(response)}
           </div>
         ) : loading ? (
           <div className="flex items-center gap-2 text-theme-muted text-sm mb-4 animate-pulse px-2">

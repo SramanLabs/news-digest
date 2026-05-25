@@ -22,13 +22,19 @@ A modern, responsive frontend web application built as a daily news digest speci
    npm install
    ```
 
-2. **Start the Development Server:**
-   Run the following command to start the app locally:
+2. **Start the Backend API Server:**
+   Run the following command to start the FastAPI backend:
+   ```bash
+   npm run backend
+   ```
+
+3. **Start the Frontend Development Server:**
+   Open another terminal and run:
    ```bash
    npm run dev
    ```
 
-3. **View the Application:**
+4. **View the Application:**
    Open your browser and navigate to [http://localhost:3000](http://localhost:3000) to see the application in action.
 
 ## Project Structure
