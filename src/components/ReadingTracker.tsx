@@ -34,7 +34,7 @@ export default function ReadingTracker() {
         accumulatedTimeRef.current += 10;
         
         // Every 30 seconds of active reading, send to backend to persist
-        if (accumulatedTimeRef.current >= 30) {
+        if (accumulatedTimeRef.current >= 30 && session.user?.email) {
           reportTime(accumulatedTimeRef.current, session.user.email);
           accumulatedTimeRef.current = 0; // Reset after reporting
         }

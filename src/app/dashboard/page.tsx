@@ -101,7 +101,7 @@ export default function DashboardPage() {
       <main className="max-w-5xl mx-auto px-6 py-12">
         <div className="mb-12">
           <h2 className="text-2xl font-extrabold tracking-tight text-theme-fg uppercase">Your Progress</h2>
-          <p className="text-theme-muted mt-1 text-sm font-semibold uppercase tracking-wider">Keep up the good work, {session.user.name?.split(' ')[0]}!</p>
+          <p className="text-theme-muted mt-1 text-sm font-semibold uppercase tracking-wider">Keep up the good work, {session.user?.name?.split(' ')[0]}!</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-16">
