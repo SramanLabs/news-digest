@@ -106,7 +106,7 @@ export default function Bizdle() {
         if (guess[j] === key) {
           const s = statuses[j];
           if (s === "correct") return "correct";
-          if (s === "present" && status !== "correct") status = "present";
+          if (s === "present") status = "present";
           if (s === "absent" && status === null) status = "absent";
         }
       }

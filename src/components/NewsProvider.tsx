@@ -102,19 +102,25 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
   }, [selectedDate]);
 
   const handleCategoryChange = useCallback((cat: string) => {
-    setSelectedCategory(cat);
-    setPage(1);
-    setArticles([]);
-    setHasMore(true);
-    setScrollPosition(0);
+    setSelectedCategory(prev => {
+      if (prev === cat) return prev;
+      setPage(1);
+      setArticles([]);
+      setHasMore(true);
+      setScrollPosition(0);
+      return cat;
+    });
   }, []);
 
   const handleDateChange = useCallback((date: string) => {
-    setSelectedDate(date);
-    setPage(1);
-    setArticles([]);
-    setHasMore(true);
-    setScrollPosition(0);
+    setSelectedDate(prev => {
+      if (prev === date) return prev;
+      setPage(1);
+      setArticles([]);
+      setHasMore(true);
+      setScrollPosition(0);
+      return date;
+    });
   }, []);
 
   const loadMore = useCallback(() => {
