@@ -14,7 +14,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         
         if (userEmail) {
           try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL as string;
             const res = await fetch(`${apiUrl}/api/auth/verify?email=${encodeURIComponent(userEmail)}`);
             if (res.ok) {
               const data = await res.json();

@@ -25,16 +25,14 @@ async def lifespan(app: FastAPI):
     try:
         if db.users.count_documents({}) == 0:
             import os
-            env_local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.local")
-            if os.path.exists(env_local_path):
-                with open(env_local_path, "r") as f:
-                    for line in f.read().splitlines():
-                        if line.startswith("ALLOWED_EMAILS="):
-                            emails = [e.strip() for e in line.split("=", 1)[1].split(",") if e.strip()]
-                            for e in emails:
-                                db.users.insert_one({"email": e, "role": "admin", "created_at": datetime.datetime.utcnow().isoformat()})
-                            logger.info(f"Bootstrapped {len(emails)} admins from .env.local")
-                            break
+            allowed_emails_str = os.getenv("ALLOWED_EMAILS")
+            if allowed_emails_str:
+                emails = [e.strip() for e in allowed_emails_str.split(",") if e.strip()]
+                for e in emails:
+                    db.users.insert_one({"email": e, "role": "admin", "created_at": datetime.datetime.utcnow().isoformat()})
+                logger.info(f"Bootstrapped {len(emails)} admins from environment variables.")
+            else:
+                logger.warning("Database is empty but ALLOWED_EMAILS is not set. No admin users were bootstrapped.")
     except Exception as e:
         logger.error(f"Error bootstrapping admins: {e}")
 
@@ -44,7 +42,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Sraman's News Digest API", lifespan=lifespan)
 
 import os
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://sraman-news-digest.vercel.app,http://localhost:3000").split(",")
 
 # CORS Configuration
 app.add_middleware(
