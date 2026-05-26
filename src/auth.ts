@@ -13,7 +13,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     error: '/login',  // Redirect errors back to our custom login page
   },
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
       if (account?.provider === "google") {
         const userEmail = user.email?.toLowerCase();
         
@@ -28,10 +28,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
       return false;
     },
-    async session({ session, token }) {
+    async session({ session }) {
       return session;
     },
-    async jwt({ token, user }) {
+    async jwt({ token }) {
       return token;
     }
   }

@@ -2,7 +2,8 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { LogIn, AlertCircle, Quote } from "lucide-react";
+import Image from "next/image";
+import { LogIn, Quote } from "lucide-react";
 import { Suspense, useEffect, useState } from "react";
 
 const QUOTES = [
@@ -33,6 +34,7 @@ function LoginContent() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
     setMounted(true);
     
@@ -55,10 +57,8 @@ function LoginContent() {
       {/* Header with Login Button */}
       <header className="w-full p-6 md:px-12 md:py-8 flex justify-between items-center relative z-20">
         <div className="font-black text-xl tracking-tighter uppercase flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)]">
-             <span className="text-white text-xs font-bold">M</span>
-          </div>
-          <span className="tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-stone-400">Digest</span>
+          <Image src="/logo.png" alt="News Digest Logo" width={32} height={32} className="w-8 h-8 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] object-cover" />
+          <span className="tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-stone-400">NEWS Digest</span>
         </div>
         
         <button
@@ -77,10 +77,10 @@ function LoginContent() {
       <main className="flex-1 flex flex-col items-center justify-center relative z-10 px-6 max-w-5xl mx-auto w-full">
         {error === "AccessDenied" ? (
           <div className="flex flex-col items-center justify-center animate-in fade-in zoom-in duration-700 max-w-lg text-center mt-[-40px]">
-            <img src="/robot-denied.png" alt="Oops, access denied!" className="w-64 h-64 md:w-80 md:h-80 object-contain drop-shadow-[0_0_30px_rgba(6,182,212,0.3)] mb-4" />
+            <Image src="/robot-denied.png" alt="Oops, access denied!" width={320} height={320} className="w-64 h-64 md:w-80 md:h-80 object-contain drop-shadow-[0_0_30px_rgba(6,182,212,0.3)] mb-4" priority />
             <h2 className="text-3xl md:text-4xl font-light text-stone-200 mb-3 tracking-tight">Oops!</h2>
             <p className="text-lg text-stone-400 leading-relaxed font-medium mb-6">
-              It looks like you don't have access to this application just yet.
+              It looks like you don&apos;t have access to this application just yet.
             </p>
             <div className="px-6 py-4 bg-cyan-950/40 border border-cyan-500/30 rounded-2xl text-cyan-200 text-sm tracking-widest uppercase font-bold shadow-[0_0_20px_rgba(6,182,212,0.15)] flex flex-col items-center gap-2">
               <span>Please reach out to the admin</span>

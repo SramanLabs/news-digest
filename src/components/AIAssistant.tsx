@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Bot, Languages, X, Sparkles, Send, BookOpen } from "lucide-react";
+import { Bot, Languages, X, Send, BookOpen } from "lucide-react";
+import Image from "next/image";
 
 export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -80,10 +81,10 @@ export default function AIAssistant() {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 w-14 h-14 bg-theme-accent text-theme-bg rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform z-50 group border border-theme-border/20 cursor-pointer"
+        className="fixed bottom-6 right-6 w-14 h-14 bg-theme-accent text-theme-bg rounded-full shadow-2xl flex items-center justify-center hover:scale-105 transition-transform z-50 group border border-theme-border/20 cursor-pointer overflow-hidden p-0"
         aria-label="Open AI Assistant"
       >
-        <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+        <Image src="/logo.png" alt="AI Assistant" width={56} height={56} className="w-full h-full object-cover rounded-full group-hover:scale-110 transition-transform" />
       </button>
     );
   }
@@ -93,7 +94,7 @@ export default function AIAssistant() {
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-theme-border/60 bg-theme-border/20 transition-colors duration-300">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <Image src="/logo.png" alt="Logo" width={20} height={20} className="w-5 h-5 rounded-md object-cover" />
           <h3 className="font-extrabold text-xs uppercase tracking-widest text-theme-fg">Reading Assistant</h3>
         </div>
         <button 

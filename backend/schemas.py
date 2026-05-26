@@ -20,7 +20,7 @@ class NewsArticleBase(BaseModel):
     source_url: str
 
 class NewsArticleResponse(NewsArticleBase):
-    id: int
+    id: str
     published_date: date
 
     class Config:
@@ -28,3 +28,18 @@ class NewsArticleResponse(NewsArticleBase):
 
 class NewsResponse(BaseModel):
     articles: List[NewsArticleResponse]
+
+# Pydantic schemas for User Stats
+class TrackTimeRequest(BaseModel):
+    email: str
+    active_seconds: int
+
+class UserStatsResponse(BaseModel):
+    email: str
+    streak_days: int
+    today_reading_seconds: int
+    last_active_date: str
+
+class MarkReadRequest(BaseModel):
+    email: str
+    article_id: str

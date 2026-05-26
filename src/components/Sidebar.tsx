@@ -2,9 +2,12 @@
 
 import { 
   LayoutGrid, Globe, Briefcase, MapPin, Flag, TrendingUp, 
-  Monitor, Landmark, Trophy, FlaskConical, Leaf, HeartPulse, Shield
+  Monitor, Landmark, Trophy, FlaskConical, Leaf, HeartPulse, Shield,
+  LineChart, Factory, Wifi, Wheat, Map, Building2, MessageSquare, PenTool, BookOpen, GraduationCap, Vote
 } from "lucide-react";
 import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
+import Image from "next/image";
 
 interface SidebarProps {
   selectedCategory: string;
@@ -16,14 +19,27 @@ const categoryIcons: Record<string, React.ComponentType<{ className?: string }>>
   National: Landmark,
   International: Globe,
   Business: Briefcase,
-  Commerce: TrendingUp,
+  Markets: LineChart,
+  Economy: TrendingUp,
+  Industry: Factory,
   Technology: Monitor,
-  Politics: Flag,
-  Sports: Trophy,
+  Internet: Wifi,
   Science: FlaskConical,
-  Environment: Leaf,
-  Regional: MapPin,
+  Agriculture: Wheat,
   Health: HeartPulse,
+  Environment: Leaf,
+  Sports: Trophy,
+  States: Map,
+  Cities: Building2,
+  "Andhra Pradesh": MapPin,
+  Opinion: MessageSquare,
+  Editorial: PenTool,
+  Books: BookOpen,
+  Education: GraduationCap,
+  Elections: Vote,
+  Commerce: TrendingUp,
+  Politics: Flag,
+  Regional: MapPin,
   Geopolitics: Shield,
 };
 
@@ -35,14 +51,27 @@ export default function Sidebar({ selectedCategory, onSelectCategory }: SidebarP
     { name: "National" },
     { name: "International" },
     { name: "Business" },
-    { name: "Commerce" },
+    { name: "Markets" },
+    { name: "Economy" },
+    { name: "Industry" },
     { name: "Technology" },
-    { name: "Politics" },
-    { name: "Sports" },
+    { name: "Internet" },
     { name: "Science" },
-    { name: "Environment" },
-    { name: "Regional" },
+    { name: "Agriculture" },
     { name: "Health" },
+    { name: "Environment" },
+    { name: "Sports" },
+    { name: "States" },
+    { name: "Cities" },
+    { name: "Andhra Pradesh" },
+    { name: "Opinion" },
+    { name: "Editorial" },
+    { name: "Books" },
+    { name: "Education" },
+    { name: "Elections" },
+    { name: "Commerce" },
+    { name: "Politics" },
+    { name: "Regional" },
     { name: "Geopolitics" },
   ];
 
@@ -83,15 +112,22 @@ export default function Sidebar({ selectedCategory, onSelectCategory }: SidebarP
             <p className="text-[10px] text-theme-muted">{session.user.email}</p>
           </div>
           {session.user.image ? (
-            <img src={session.user.image} alt="User Avatar" className="w-8 h-8 rounded-full border border-theme-border shadow-sm" />
+            <Image src={session.user.image} alt="User Avatar" width={32} height={32} className="w-8 h-8 rounded-full border border-theme-border shadow-sm" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-theme-accent/20 flex items-center justify-center text-theme-accent font-bold text-xs border border-theme-accent/30">
               {session.user.name?.charAt(0) || "U"}
             </div>
           )}
+          <Link 
+            href="/dashboard"
+            className="text-xs font-bold text-theme-muted hover:text-theme-fg uppercase tracking-widest ml-4 transition-colors cursor-pointer"
+            title="Dashboard"
+          >
+            Dashboard
+          </Link>
           <button 
-            onClick={() => signOut()}
-            className="text-xs font-bold text-theme-muted hover:text-red-500 uppercase tracking-widest ml-2 transition-colors cursor-pointer"
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="text-xs font-bold text-theme-muted hover:text-red-500 uppercase tracking-widest ml-4 transition-colors cursor-pointer"
             title="Sign Out"
           >
             Logout

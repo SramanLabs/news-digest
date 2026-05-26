@@ -7,6 +7,9 @@ from typing import Optional
 from google import genai
 from dotenv import load_dotenv
 from schemas import ArticleList
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -23,13 +26,23 @@ def fetch_raw_news(target_date: Optional[datetime.date] = None) -> list:
         "International": "https://www.thehindu.com/news/international/feeder/default.rss",
         "Business": "https://www.thehindu.com/business/feeder/default.rss",
         "Markets": "https://www.thehindu.com/business/markets/feeder/default.rss",
+        "Economy": "https://www.thehindu.com/business/Economy/feeder/default.rss",
+        "Industry": "https://www.thehindu.com/business/Industry/feeder/default.rss",
         "Technology": "https://www.thehindu.com/sci-tech/technology/feeder/default.rss",
+        "Internet": "https://www.thehindu.com/sci-tech/internet/feeder/default.rss",
         "Science": "https://www.thehindu.com/sci-tech/science/feeder/default.rss",
+        "Agriculture": "https://www.thehindu.com/sci-tech/agriculture/feeder/default.rss",
         "Health": "https://www.thehindu.com/sci-tech/health/feeder/default.rss",
         "Environment": "https://www.thehindu.com/sci-tech/energy-and-environment/feeder/default.rss",
         "Sports": "https://www.thehindu.com/sport/feeder/default.rss",
         "States": "https://www.thehindu.com/news/states/feeder/default.rss",
-        "Cities": "https://www.thehindu.com/news/cities/feeder/default.rss"
+        "Cities": "https://www.thehindu.com/news/cities/feeder/default.rss",
+        "Andhra Pradesh": "https://www.thehindu.com/news/national/andhra-pradesh/feeder/default.rss",
+        "Opinion": "https://www.thehindu.com/opinion/feeder/default.rss",
+        "Editorial": "https://www.thehindu.com/opinion/editorial/feeder/default.rss",
+        "Books": "https://www.thehindu.com/books/feeder/default.rss",
+        "Education": "https://www.thehindu.com/education/feeder/default.rss",
+        "Elections": "https://www.thehindu.com/elections/feeder/default.rss"
     }
     
     all_articles = []
@@ -74,69 +87,86 @@ def fetch_raw_news(target_date: Optional[datetime.date] = None) -> list:
 
 def process_news_with_gemini(raw_news_data: list) -> ArticleList:
     all_processed_articles = []
-    # Process in batches of 15 to stay well within Gemini's 8K output token limit
-    batch_size = 15
+    # Process in batches of 30 to reduce the number of API calls
+    batch_size = 30
     
     for i in range(0, len(raw_news_data), batch_size):
         batch = raw_news_data[i:i + batch_size]
         
-        prompt = f"""You are an expert MBA news editor for Sraman Briefcase. Summarize these articles. You MUST assign each article to exactly one of the following categories: 'Commerce', 'National', 'International', 'Regional', 'Business', 'Technology', 'Politics', 'Sports', 'Health', 'Science', 'Environment', or 'Geopolitics'. Do NOT invent new categories.
+        prompt = f"""You are an expert MBA news editor for Sraman Briefcase. Summarize these articles. You MUST assign each article to exactly one of the following categories: 'National', 'International', 'Business', 'Markets', 'Economy', 'Industry', 'Technology', 'Internet', 'Science', 'Agriculture', 'Health', 'Environment', 'Sports', 'States', 'Cities', 'Andhra Pradesh', 'Opinion', 'Editorial', 'Books', 'Education', 'Elections', 'Geopolitics', 'Commerce', 'Politics'. Do NOT invent new categories.
         
         CRITICAL: You MUST process EVERY SINGLE article provided in the input. If the input contains {len(batch)} articles, you MUST output exactly {len(batch)} summaries. Do not group them together. Do not skip any.
         
         Raw news data:
         {batch}
         """
+        models_to_try = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-2.0-flash']
+        max_retries = 3
         
-        try:
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-                config={
-                    'response_mime_type': 'application/json',
-                    'response_schema': ArticleList
-                }
-            )
-            if response.parsed and hasattr(response.parsed, 'articles'):
-                all_processed_articles.extend(response.parsed.articles)
-        except Exception as e:
-            print(f"Error processing batch starting at index {i}: {e}")
+        for attempt in range(max_retries):
+            current_model = models_to_try[attempt % len(models_to_try)]
+            try:
+                response = client.models.generate_content(
+                    model=current_model,
+                    contents=prompt,
+                    config={
+                        'response_mime_type': 'application/json',
+                        'response_schema': ArticleList
+                    }
+                )
+                if response.parsed and hasattr(response.parsed, 'articles'):
+                    all_processed_articles.extend(response.parsed.articles)
+                break
+            except Exception as e:
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    wait_time = 15 * (attempt + 1)
+                    logger.warning(f"Rate limited (429) on {current_model}. Waiting {wait_time}s before falling back to next model...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Error processing batch starting at index {i}: {e}", exc_info=True)
+                    break
             
-        # Sleep to avoid hitting rate limits
-        time.sleep(3)
+        # Sleep to stay well under Gemini's 15 Requests Per Minute free tier limit
+        time.sleep(15)
             
     return ArticleList(articles=all_processed_articles)
 
+from deep_translator import GoogleTranslator
+
 def get_definition(word: str) -> str:
-    prompt = f"""You are Sraman Briefcase, an elite MBA tutor and AI business strategist. 
-    Analyze the word or phrase: "{word}"
-    
-    Provide a response strictly structured exactly in the following format (do NOT use markdown headers or bold subtitles, keep it clean, highly professional, and concise):
-    
-    Part of Speech: [Noun, Verb, Adjective, etc.]
-    Meaning: [A clear, comprehensive definition restricted to a maximum of 2 lines/sentences]
-    Usage Example: [A highly relevant business or professional usage example of the word/phrase]
-    """
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        return response.text
+        response = requests.get(f"https://api.dictionaryapi.dev/api/v2/entries/en/{word}")
+        if response.status_code != 200:
+            return "Sorry, could not find a definition for that word."
+            
+        data = response.json()
+        if not isinstance(data, list) or len(data) == 0:
+            return "Sorry, could not find a definition for that word."
+            
+        entry = data[0]
+        meanings = entry.get("meanings", [])
+        if not meanings:
+            return "No meanings found."
+            
+        meaning = meanings[0]
+        pos = meaning.get("partOfSpeech", "Unknown")
+        pos = pos.capitalize()
+        definitions = meaning.get("definitions", [])
+        
+        if not definitions:
+            return "No definitions found."
+            
+        def_text = definitions[0].get("definition", "")
+        
+        return f"Part of Speech: {pos}\nMeaning: {def_text}"
     except Exception as e:
-        return f"Error generating definition: {e}"
+        return f"Error fetching definition: {e}"
 
 def get_translation(word: str, language: str) -> str:
-    prompt = f"""You are an elite, highly accurate language translator. 
-    Translate the following word/phrase into {language}: "{word}"
-    
-    Provide only the precise translation followed by a very brief grammatical or contextual note in English if helpful. Limit to 1-2 sentences.
-    """
     try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-        )
-        return response.text
+        # deep-translator handles lowercase full language names (e.g. 'hindi', 'spanish')
+        target_lang = language.lower()
+        translated = GoogleTranslator(source='auto', target=target_lang).translate(word)
+        return translated
     except Exception as e:
-        return f"Error generating translation: {e}"
+        return f"Error translating text: {e}"

@@ -1,9 +1,11 @@
 fastapi
 uvicorn
 google-genai
-sqlalchemy
 apscheduler
 requests
 python-dotenv
 pydantic
 dotenv
+motor
+dnspython
+deep-translator

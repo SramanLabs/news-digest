@@ -4,35 +4,35 @@ from typing import Optional
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 from apscheduler.schedulers.background import BackgroundScheduler
 
-import models, schemas, services
-from database import engine, get_db, SessionLocal
+import schemas, services
+from database import get_db
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Create tables
-models.Base.metadata.create_all(bind=engine)
 
 scheduler = BackgroundScheduler()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    scheduler.add_job(fetch_and_store_news, 'cron', hour=0, minute=1)
+    # Run every 60 minutes to preserve Gemini daily quota limits
+    scheduler.add_job(fetch_and_store_news, 'interval', minutes=60)
     scheduler.start()
     yield
     scheduler.shutdown()
 
 app = FastAPI(title="Sraman's News Digest API", lifespan=lifespan)
 
+import os
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -44,27 +44,62 @@ def fetch_and_store_news(target_date: Optional[datetime.date] = None):
         # Fetch raw news
         raw_news = services.fetch_raw_news(target_date)
         
-        # Process with Gemini
-        processed_data = services.process_news_with_gemini(raw_news)
+        from database import db
         
-        db = SessionLocal()
-        try:
-            for article in processed_data.articles:
-                db_article = models.NewsArticle(
-                    published_date=target_date,
-                    category=article.category,
-                    headline=article.headline,
-                    description=article.description,
-                    source_url=article.source_url
-                )
-                db.add(db_article)
-            db.commit()
-            logger.info(f"Successfully stored {len(processed_data.articles)} articles for {target_date}.")
-        except Exception as db_e:
-            db.rollback()
-            logger.error(f"Database error: {db_e}")
-        finally:
-            db.close()
+        # Filter raw news to only process new articles that aren't already in the DB
+        unprocessed_news = []
+        seen_links_in_batch = set()
+        
+        for raw_article in raw_news:
+            link = raw_article["link"]
+            
+            # Skip if we already added this exact same link in this current batch (removes duplicate API calls)
+            if link in seen_links_in_batch:
+                continue
+                
+            # Check both the main articles collection and our 'attempted' urls collection
+            existing_by_link = db.news_articles.find_one({"source_url": link})
+            existing_attempt = db.processed_urls.find_one({"source_url": link})
+            
+            if not existing_by_link and not existing_attempt:
+                unprocessed_news.append(raw_article)
+                seen_links_in_batch.add(link)
+                
+        if not unprocessed_news:
+            logger.info(f"No new articles to fetch for {target_date}.")
+            return
+            
+        # Immediately mark these as attempted so we never get stuck in an infinite retry loop if Gemini fails
+        attempted_urls = [{"source_url": a["link"], "attempted_at": datetime.datetime.utcnow()} for a in unprocessed_news]
+        if attempted_urls:
+            db.processed_urls.insert_many(attempted_urls)
+            
+        # Process with Gemini
+        processed_data = services.process_news_with_gemini(unprocessed_news)
+        
+        articles_to_insert = []
+        for article in processed_data.articles:
+            # Final deduplication by headline or source_url just in case
+            existing = db.news_articles.find_one({
+                "$or": [
+                    {"headline": article.headline, "published_date": target_date.isoformat()},
+                    {"source_url": article.source_url}
+                ]
+            })
+            if not existing:
+                articles_to_insert.append({
+                    "published_date": target_date.isoformat(),
+                    "category": article.category,
+                    "headline": article.headline,
+                    "description": article.description,
+                    "source_url": article.source_url
+                })
+        
+        if articles_to_insert:
+            db.news_articles.insert_many(articles_to_insert)
+            logger.info(f"Successfully stored {len(articles_to_insert)} new articles for {target_date}.")
+        else:
+            logger.info(f"No new articles to store for {target_date} (all duplicates or empty batch).")
             
     except Exception as e:
         logger.error(f"Error in news fetch pipeline: {e}")
@@ -77,17 +112,28 @@ def get_news(
     category: Optional[str] = None, 
     skip: int = 0,
     limit: int = 20,
-    db: Session = Depends(get_db)
+    db = Depends(get_db)
 ):
-    query = db.query(models.NewsArticle)
-    
+    query = {}
     if date:
-        query = query.filter(models.NewsArticle.published_date == date)
+        query["published_date"] = date.isoformat()
     if category:
-        query = query.filter(models.NewsArticle.category.ilike(category))
+        import re
+        safe_category = re.escape(category)
+        query["category"] = re.compile(f"^{safe_category}$", re.IGNORECASE)
         
-    query = query.order_by(models.NewsArticle.id.desc())
-    articles = query.offset(skip).limit(limit).all()
+    cursor = db.news_articles.find(query).sort("_id", -1).skip(skip).limit(limit)
+    
+    articles = []
+    for doc in cursor:
+        articles.append({
+            "id": str(doc["_id"]),
+            "published_date": datetime.date.fromisoformat(doc["published_date"]),
+            "category": doc["category"],
+            "headline": doc["headline"],
+            "description": doc["description"],
+            "source_url": doc["source_url"]
+        })
     return schemas.NewsResponse(articles=articles)
 
 @app.post("/api/news/trigger-fetch")
@@ -104,6 +150,105 @@ def assistant_define(word: str):
 def assistant_translate(word: str, language: str):
     translation = services.get_translation(word, language)
     return {"result": translation}
+
+@app.get("/api/user/stats", response_model=schemas.UserStatsResponse)
+def get_user_stats(email: str, db = Depends(get_db)):
+    if not email:
+        return schemas.UserStatsResponse(email="", streak_days=0, today_reading_seconds=0, last_active_date="")
+    
+    today_str = datetime.date.today().isoformat()
+    stats = db.user_stats.find_one({"email": email})
+    
+    if not stats:
+        return schemas.UserStatsResponse(email=email, streak_days=0, today_reading_seconds=0, last_active_date="")
+    
+    # If last active date is older than yesterday, streak might be broken, but we'll let the track-time logic handle exact calculations
+    # or just return as is.
+    today_reading = stats.get("daily_reading", {}).get(today_str, 0)
+    
+    return schemas.UserStatsResponse(
+        email=email,
+        streak_days=stats.get("streak_days", 0),
+        today_reading_seconds=today_reading,
+        last_active_date=stats.get("last_active_date", "")
+    )
+
+@app.post("/api/user/track-time")
+def track_user_time(req: schemas.TrackTimeRequest, db = Depends(get_db)):
+    if not req.email:
+        return {"status": "ignored", "reason": "No email provided"}
+        
+    today_date = datetime.date.today()
+    today_str = today_date.isoformat()
+    yesterday_str = (today_date - datetime.timedelta(days=1)).isoformat()
+    
+    stats = db.user_stats.find_one({"email": req.email})
+    
+    if not stats:
+        db.user_stats.insert_one({
+            "email": req.email,
+            "streak_days": 1,
+            "last_active_date": today_str,
+            "daily_reading": {today_str: req.active_seconds}
+        })
+    else:
+        last_active = stats.get("last_active_date", "")
+        current_streak = stats.get("streak_days", 0)
+        daily_reading = stats.get("daily_reading", {})
+        
+        # Update streak
+        if last_active == yesterday_str:
+            current_streak += 1
+        elif last_active != today_str:
+            # Streak broken, reset to 1
+            current_streak = 1
+            
+        # Update daily reading time
+        current_daily = daily_reading.get(today_str, 0)
+        daily_reading[today_str] = current_daily + req.active_seconds
+        
+        db.user_stats.update_one(
+            {"email": req.email},
+            {"$set": {
+                "streak_days": current_streak,
+                "last_active_date": today_str,
+                "daily_reading": daily_reading
+            }}
+        )
+        
+    return {"status": "success"}
+
+@app.get("/api/user/read-articles")
+def get_read_articles(email: str, db = Depends(get_db)):
+    if not email:
+        return {"read_article_ids": []}
+    
+    stats = db.user_stats.find_one({"email": email})
+    if not stats:
+        return {"read_article_ids": []}
+        
+    return {"read_article_ids": stats.get("read_articles", [])}
+
+@app.post("/api/user/read-article")
+def mark_article_read(req: schemas.MarkReadRequest, db = Depends(get_db)):
+    if not req.email or not req.article_id:
+        return {"status": "ignored"}
+        
+    db.user_stats.update_one(
+        {"email": req.email},
+        {"$addToSet": {"read_articles": req.article_id}},
+        upsert=True
+    )
+    
+    return {"status": "success"}
+
+@app.delete("/api/admin/reset-database")
+async def reset_database():
+    """DANGER: Completely clears the database for deployment prep."""
+    db.users.drop()
+    db.news_articles.drop()
+    db.attempted_urls.drop()
+    return {"message": "Database completely reset to initial state"}
 
 if __name__ == "__main__":
     import uvicorn

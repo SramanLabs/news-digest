@@ -1,29 +1,17 @@
-import { ArrowRight } from "lucide-react";
+"use client";
+
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { Article } from "@/types/article";
 import { formatLocalDate } from "@/utils/date";
+import { getCategoryColor } from "@/utils/categoryColors";
+import { useNews } from "./NewsProvider";
 
 export default function NewsCard({ article }: { article: Article }) {
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case "Commerce": return "text-[#0F766E] dark:text-[#2DD4BF]";
-      case "National": return "text-[#1E3A8A] dark:text-[#93C5FD]";
-      case "International": return "text-[#6B21A8] dark:text-[#D8B4FE]";
-      case "Regional": return "text-[#C2410C] dark:text-[#FDBA74]";
-      case "Business": return "text-[#0369A1] dark:text-[#7DD3FC]";
-      case "Technology": return "text-[#0E7490] dark:text-[#67E8F9]";
-      case "Politics": return "text-[#B91C1C] dark:text-[#FCA5A5]";
-      case "Sports": return "text-[#B45309] dark:text-[#FCD34D]";
-      case "Health": return "text-[#E11D48] dark:text-[#FB7185]";
-      case "Geopolitics": return "text-[#6366F1] dark:text-[#818CF8]";
-      case "Science": return "text-[#4338CA] dark:text-[#A5B4FC]";
-      case "Environment": return "text-[#15803D] dark:text-[#86EFAC]";
-      case "Entertainment": return "text-[#9D174D] dark:text-[#F472B6]";
-      default: return "text-[#6B6055] dark:text-[#9A9182]";
-    }
-  };
+  const { readArticleIds, markAsRead } = useNews();
+  const isRead = readArticleIds.has(article.id);
 
   return (
-    <article className="group break-inside-avoid flex flex-col justify-between py-2 transition-opacity hover:opacity-85 border-b border-theme-border/50 pb-8 transition-colors duration-300">
+    <article className={`group break-inside-avoid flex flex-col justify-between py-2 transition-all hover:opacity-85 border-b border-theme-border/50 pb-8 duration-300 ${isRead ? 'opacity-60 grayscale-[20%]' : ''}`}>
       <div>
         <div className="flex items-center gap-3 mb-4">
           <span className={`text-xs font-extrabold tracking-widest uppercase ${getCategoryColor(article.category)}`}>
@@ -33,6 +21,14 @@ export default function NewsCard({ article }: { article: Article }) {
           <span className="text-xs font-bold text-theme-muted uppercase tracking-widest">
             {formatLocalDate(article.published_date, { month: 'short', day: 'numeric', year: 'numeric'})}
           </span>
+          {isRead && (
+            <>
+              <span className="w-1 h-1 rounded-full bg-theme-border"></span>
+              <span className="flex items-center gap-1 text-[10px] font-bold text-green-600 dark:text-green-400 uppercase tracking-widest">
+                <CheckCircle2 className="w-3 h-3" /> Read
+              </span>
+            </>
+          )}
         </div>
         
         <h2 className="text-3xl md:text-4xl font-extrabold text-theme-fg mb-4 leading-[1.1] tracking-tight transition-colors duration-300">
@@ -49,6 +45,7 @@ export default function NewsCard({ article }: { article: Article }) {
           href={article.source_url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => markAsRead(article.id)}
           className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-theme-fg group-hover:underline underline-offset-4 decoration-2 transition-colors duration-300"
         >
           Read Original Source

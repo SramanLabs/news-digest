@@ -5,25 +5,35 @@ import Sidebar from "@/components/Sidebar";
 import DateSelector from "@/components/DateSelector";
 import NewsCard from "@/components/NewsCard";
 import AIAssistant from "@/components/AIAssistant";
-import { Article } from "@/types/article";
+import ReadingTracker from "@/components/ReadingTracker";
 import { getLocalDateString, formatLocalDate } from "@/utils/date";
+import Image from "next/image";
+import { useNews } from "@/components/NewsProvider";
 
 type Theme = "paper" | "sage" | "alabaster" | "dark";
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedDate, setSelectedDate] = useState("");
   const [theme, setTheme] = useState<Theme>("paper");
-  const [articles, setArticles] = useState<Article[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-
-  // AI curation fetching state
-  const [isFetchingNews, setIsFetchingNews] = useState(false);
-  const [fetchStatus, setFetchStatus] = useState<string | null>(null);
+  
+  const {
+    selectedCategory,
+    selectedDate,
+    articles,
+    page,
+    hasMore,
+    isLoading,
+    error,
+    isFetchingNews,
+    fetchStatus,
+    handleCategoryChange,
+    handleDateChange,
+    handleFetchNewsForDate,
+    loadMore,
+    setScrollPosition,
+    scrollPosition,
+    readArticleIds
+  } = useNews();
 
   const observer = useRef<IntersectionObserver | null>(null);
   const lastArticleElementRef = useCallback((node: HTMLDivElement | null) => {
@@ -31,16 +41,31 @@ export default function Home() {
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
       if (entries[0].isIntersecting && hasMore) {
-        setPage(prevPage => prevPage + 1);
+        loadMore();
       }
     });
     if (node) observer.current.observe(node);
-  }, [isLoading, hasMore]);
+  }, [isLoading, hasMore, loadMore]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
-    setSelectedDate(getLocalDateString(new Date()));
+
+    // Restore scroll position
+    if (scrollPosition > 0) {
+      setTimeout(() => window.scrollTo(0, scrollPosition), 50);
+    }
+
+    // Track scroll position
+    let timeoutId: NodeJS.Timeout;
+    const handleScroll = () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        setScrollPosition(window.scrollY);
+      }, 100);
+    };
+
+    window.addEventListener("scroll", handleScroll);
 
     // Load theme from localStorage on client side mount
     const savedTheme = localStorage.getItem("mba-digest-theme") as Theme | null;
@@ -50,6 +75,12 @@ export default function Home() {
     } else {
       document.documentElement.setAttribute("data-theme", "paper");
     }
+
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      clearTimeout(timeoutId);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleThemeChange = (newTheme: Theme) => {
@@ -57,114 +88,6 @@ export default function Home() {
     document.documentElement.setAttribute("data-theme", newTheme);
     localStorage.setItem("mba-digest-theme", newTheme);
   };
-
-  const handleCategoryChange = (cat: string) => {
-    setSelectedCategory(cat);
-    setPage(1);
-    setArticles([]);
-    setHasMore(true);
-  };
-
-  const handleDateChange = (date: string) => {
-    setSelectedDate(date);
-    setPage(1);
-    setArticles([]);
-    setHasMore(true);
-  };
-
-  const handleFetchNewsForDate = async () => {
-    setIsFetchingNews(true);
-    setError(null);
-    setFetchStatus("Triggering Gemini API News Pipeline...");
-    try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(`${apiUrl}/api/news/trigger-fetch?date=${selectedDate}`, {
-        method: "POST"
-      });
-      if (!res.ok) throw new Error("Failed to trigger news pipeline");
-      
-      setFetchStatus("Fetching RSS feeds & running Gemini MBA Curation (~20 seconds)...");
-      
-      // Poll every 5 seconds until articles show up
-      let attempts = 0;
-      const interval = setInterval(async () => {
-        attempts++;
-        try {
-          const checkUrl = new URL(`${apiUrl}/api/news`);
-          checkUrl.searchParams.append("date", selectedDate);
-          checkUrl.searchParams.append("limit", "1");
-          const checkRes = await fetch(checkUrl.toString());
-          if (checkRes.ok) {
-            const checkData = await checkRes.json();
-            if (checkData.articles && checkData.articles.length > 0) {
-              clearInterval(interval);
-              setIsFetchingNews(false);
-              setFetchStatus(null);
-              // Force reload page
-              setPage(1);
-              setArticles([]);
-              setHasMore(true);
-              const dateCopy = selectedDate;
-              setSelectedDate("");
-              setTimeout(() => setSelectedDate(dateCopy), 10);
-            }
-          }
-        } catch (err) {
-          console.error("Error polling database:", err);
-        }
-        
-        if (attempts > 12) { // Max 1 minute polling
-          clearInterval(interval);
-          setIsFetchingNews(false);
-          setFetchStatus(null);
-          setError("Fetching took longer than expected. Please check again in a bit.");
-        }
-      }, 5000);
-      
-    } catch (err) {
-      console.error("Fetch pipeline trigger failed:", err);
-      setError("Failed to start news fetching pipeline.");
-      setIsFetchingNews(false);
-      setFetchStatus(null);
-    }
-  };
-
-  useEffect(() => {
-    if (!selectedDate) return;
-
-    const fetchNews = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        const url = new URL(`${apiUrl}/api/news`);
-        url.searchParams.append("date", selectedDate);
-        if (selectedCategory !== "All") {
-          url.searchParams.append("category", selectedCategory);
-        }
-        url.searchParams.append("skip", ((page - 1) * 20).toString());
-        url.searchParams.append("limit", "20");
-
-        const res = await fetch(url.toString());
-        if (!res.ok) {
-          throw new Error("Failed to fetch news");
-        }
-        
-        const data = await res.json();
-        const newArticles = data.articles || [];
-        setArticles(prev => page === 1 ? newArticles : [...prev, ...newArticles]);
-        setHasMore(newArticles.length === 20);
-      } catch (err: unknown) {
-        console.error("Error fetching news:", err);
-        setError("Failed to load news articles. Please try again later.");
-        if (page === 1) setArticles([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchNews();
-  }, [selectedDate, selectedCategory, page]);
 
   return (
     <div className="min-h-screen bg-theme-bg text-theme-fg font-sans selection:bg-theme-selection-bg transition-colors duration-300">
@@ -174,7 +97,10 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 py-6 md:py-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
             <div>
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-theme-fg uppercase mb-1">NEWS Digest</h1>
+              <div className="flex items-center gap-4 mb-1">
+                <Image src="/logo.png" alt="Logo" width={40} height={40} className="w-10 h-10 md:w-12 md:h-12 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] object-cover" />
+                <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-theme-fg uppercase">NEWS Digest</h1>
+              </div>
               <div className="flex flex-wrap items-center gap-3 mt-2.5">
                 <span className="text-xs font-bold text-theme-muted uppercase tracking-widest">The Daily Brief</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-theme-border"></span>
@@ -271,29 +197,75 @@ export default function Home() {
         {!isMounted || !selectedDate || (isLoading && page === 1) ? (
           <ArticlesSkeleton />
         ) : error && page === 1 ? (
-          <div className="flex flex-col items-center justify-center py-32 text-center text-red-500">
-            <h3 className="text-2xl font-bold mb-3 tracking-tight">Error Loading News</h3>
-            <p className="max-w-md font-medium">{error}</p>
-          </div>
+          error.includes("Fetching took longer") ? (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-16 h-16 mb-6 text-theme-muted/50 animate-pulse">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold mb-3 tracking-tight text-theme-fg">Still Working on It...</h3>
+              <p className="max-w-md font-medium text-theme-muted mb-8">
+                The AI is taking a little longer than usual to curate today&apos;s news. It is running safely in the background and your articles will be available shortly.
+              </p>
+              <button
+                onClick={() => window.location.reload()}
+                className="px-6 py-3 border border-theme-border hover:border-theme-fg font-semibold text-sm uppercase tracking-widest transition-all cursor-pointer rounded-xl"
+              >
+                Refresh Page
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 text-center text-red-500">
+              <h3 className="text-2xl font-bold mb-3 tracking-tight">Error Loading News</h3>
+              <p className="max-w-md font-medium">{error}</p>
+            </div>
+          )
         ) : articles.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-16">
-              {articles.map((article, index) => {
-                if (articles.length === index + 1) {
-                  return (
-                    <div ref={lastArticleElementRef} key={`${article.id}-${index}`} className="h-full flex flex-col">
-                      <NewsCard article={article} />
+            {(() => {
+              const isToday = selectedDate === getLocalDateString(new Date());
+              const trendingArticles = isToday ? articles.filter(a => !readArticleIds.has(a.id)) : [];
+              const regularArticles = isToday ? articles.filter(a => readArticleIds.has(a.id)) : articles;
+
+              return (
+                <>
+                  {isToday && trendingArticles.length > 0 && (
+                    <div className="mb-16">
+                      <div className="flex items-center gap-3 mb-8">
+                        <span className="w-3 h-3 rounded-full bg-theme-accent animate-pulse"></span>
+                        <h3 className="text-xl md:text-2xl font-extrabold tracking-tight text-theme-fg uppercase">Trending Today</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-16">
+                        {trendingArticles.map((article, index) => (
+                          <div key={`trending-${article.id}-${index}`} className="h-full flex flex-col">
+                            <NewsCard article={article} />
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  );
-                } else {
-                  return (
-                    <div key={`${article.id}-${index}`} className="h-full flex flex-col">
-                      <NewsCard article={article} />
+                  )}
+                  
+                  {regularArticles.length > 0 && (
+                    <div>
+                      {isToday && trendingArticles.length > 0 && (
+                        <h3 className="text-lg md:text-xl font-bold tracking-tight text-theme-muted uppercase mb-8 border-b border-theme-border/50 pb-2">Previously Read / Feed</h3>
+                      )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-16">
+                        {regularArticles.map((article, index) => {
+                          return (
+                            <div key={`${article.id}-${index}`} className="h-full flex flex-col">
+                              <NewsCard article={article} />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  );
-                }
-              })}
-            </div>
+                  )}
+                  <div ref={lastArticleElementRef} className="h-1 w-full" />
+                </>
+              );
+            })()}
             {isLoading && page > 1 && (
               <div className="mt-12">
                 <ArticlesSkeleton />
@@ -324,7 +296,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   handleCategoryChange("All");
-                  handleDateChange(getLocalDateString(new Date()));
+                  handleDateChange(""); // will be handled by provider to reset
                 }}
                 className="px-6 py-3 border border-theme-border hover:border-theme-fg font-semibold text-sm uppercase tracking-widest transition-all cursor-pointer"
               >
@@ -337,6 +309,9 @@ export default function Home() {
 
       {/* Floating AI Assistant */}
       <AIAssistant />
+      
+      {/* Invisible Reading Tracker */}
+      <ReadingTracker />
     </div>
   );
 }
