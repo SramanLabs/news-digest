@@ -8,7 +8,7 @@ import TicTacToe from "@/components/games/TicTacToe";
 import Bizdle from "@/components/games/Bizdle";
 import { Flame, Clock, ArrowLeft } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface UserStats {
   email: string;

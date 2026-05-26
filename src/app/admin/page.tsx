@@ -11,6 +11,8 @@ interface UserResponse {
   created_at: string;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const [users, setUsers] = useState<UserResponse[]>([]);
@@ -24,7 +26,6 @@ export default function AdminPage() {
     if (!session?.user?.email || session.user.role !== "admin") return;
     
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
       const res = await fetch(`${API_URL}/api/admin/users?admin_email=${encodeURIComponent(session.user.email)}`);
       
       if (!res.ok) throw new Error("Failed to fetch users");
@@ -54,7 +55,6 @@ export default function AdminPage() {
     if (!newEmail.trim() || !session?.user?.email) return;
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
       const res = await fetch(`${API_URL}/api/admin/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -79,7 +79,6 @@ export default function AdminPage() {
   const handleUpdateRole = async (email: string, role: string) => {
     if (!session?.user?.email) return;
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
       const res = await fetch(`${API_URL}/api/admin/users/${encodeURIComponent(email)}/role`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -104,7 +103,6 @@ export default function AdminPage() {
     if (!confirm(`Are you sure you want to revoke access for ${email}?`)) return;
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
       const res = await fetch(`${API_URL}/api/admin/users/${encodeURIComponent(email)}?admin_email=${encodeURIComponent(session.user.email)}`, {
         method: "DELETE"
       });
@@ -171,16 +169,34 @@ export default function AdminPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-12">
         {error && (
-          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start gap-3">
-            <X className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-sm font-semibold text-red-500">{error}</p>
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <X className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-semibold text-red-500">{error}</p>
+            </div>
+            <button 
+              onClick={() => setError(null)} 
+              className="text-red-500/60 hover:text-red-500 transition-colors cursor-pointer shrink-0 mt-0.5"
+              aria-label="Close error message"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
         
         {success && (
-          <div className="mb-8 p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-start gap-3">
-            <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
-            <p className="text-sm font-semibold text-green-500">{success}</p>
+          <div className="mb-8 p-4 bg-green-500/10 border border-green-500/20 rounded-xl flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <Check className="w-5 h-5 text-green-500 shrink-0 mt-0.5" />
+              <p className="text-sm font-semibold text-green-500">{success}</p>
+            </div>
+            <button 
+              onClick={() => setSuccess(null)} 
+              className="text-green-500/60 hover:text-green-500 transition-colors cursor-pointer shrink-0 mt-0.5"
+              aria-label="Close success message"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         )}
 
@@ -252,7 +268,7 @@ export default function AdminPage() {
                     {users.map((user) => (
                       <tr key={user.email} className="border-b border-theme-border/30 hover:bg-theme-bg/30 transition-colors">
                         <td className="p-4 pl-6 md:pl-8">
-                          <div className="font-bold text-theme-fg truncate max-w-[150px] sm:max-w-[200px]">{user.email}</div>
+                          <div className="font-bold text-theme-fg break-all">{user.email}</div>
                           {user.email === session.user.email && (
                             <span className="text-[10px] font-bold text-theme-accent uppercase tracking-widest mt-1 block">You</span>
                           )}

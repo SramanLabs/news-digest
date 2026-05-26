@@ -42,7 +42,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Sraman's News Digest API", lifespan=lifespan)
 
 import os
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "https://sraman-news-digest.vercel.app,http://localhost:3000").split(",")
+raw_origins = os.getenv("ALLOWED_ORIGINS", "https://sraman-news-digest.vercel.app,http://localhost:3000")
+ALLOWED_ORIGINS = []
+for origin in raw_origins.split(","):
+    o = origin.strip().strip("'\"")
+    if o:
+        ALLOWED_ORIGINS.append(o)
+        if o.endswith("/"):
+            ALLOWED_ORIGINS.append(o[:-1])
 
 # CORS Configuration
 app.add_middleware(

@@ -14,7 +14,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         
         if (userEmail) {
           try {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL as string;
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://news-digest-backend.onrender.com";
             const res = await fetch(`${apiUrl}/api/auth/verify?email=${encodeURIComponent(userEmail)}`);
             if (res.ok) {
               const data = await res.json();

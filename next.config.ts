@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  async rewrites() {
+    return {
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'https://news-digest-backend.onrender.com/api/:path*',
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;

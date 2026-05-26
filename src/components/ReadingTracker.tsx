@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 export default function ReadingTracker() {
   const { data: session } = useSession();

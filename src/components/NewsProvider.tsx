@@ -5,7 +5,7 @@ import { Article } from "@/types/article";
 import { getLocalDateString } from "@/utils/date";
 import { useSession } from "next-auth/react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
 interface NewsContextType {
   selectedCategory: string;
@@ -54,7 +54,7 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
     if (userEmail) {
       const fetchReadStats = async () => {
         try {
-          const res = await fetch(`/api/user/read-articles?email=${encodeURIComponent(userEmail)}`);
+          const res = await fetch(`${API_URL}/api/user/read-articles?email=${encodeURIComponent(userEmail)}`);
           if (res.ok) {
             const data = await res.json();
             setReadArticleIds(new Set(data.read_article_ids || []));
@@ -147,7 +147,9 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
       const interval = setInterval(async () => {
         attempts++;
         try {
-          const checkUrl = new URL(`${API_URL}/api/news`);
+          const checkUrl = API_URL 
+            ? new URL(`${API_URL}/api/news`) 
+            : new URL('/api/news', window.location.origin);
           checkUrl.searchParams.append("date", selectedDate);
           checkUrl.searchParams.append("limit", "1");
           const checkRes = await fetch(checkUrl.toString());
@@ -193,7 +195,9 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
       try {
-        const url = new URL(`${API_URL}/api/news`);
+        const url = API_URL 
+          ? new URL(`${API_URL}/api/news`) 
+          : new URL('/api/news', window.location.origin);
         url.searchParams.append("date", selectedDate);
         if (selectedCategory !== "All") {
           url.searchParams.append("category", selectedCategory);
