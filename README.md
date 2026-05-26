@@ -145,6 +145,27 @@ npm run backend
 npm run dev
 ```
 
+## ☁️ Deployment
+
+### Deploying the Frontend to Vercel
+
+This repository is configured for a frontend-only deployment to Vercel. The backend (Python API) is intentionally excluded from the Vercel build process to keep the deployment lightweight and focused on the Next.js client.
+
+**Why is the backend excluded?**
+The Next.js frontend is deployed as a standalone application on Vercel. The backend is excluded from this deployment process using the `.vercelignore` file to prevent Vercel from attempting to process or build Python server files and their virtual environments.
+
+**Deployment Steps:**
+1. Push your repository to GitHub.
+2. Go to your [Vercel Dashboard](https://vercel.com/dashboard) and click **Add New Project**.
+3. Import this repository.
+4. Vercel will automatically detect the Next.js framework. It will use the settings provided in `vercel.json`:
+   - Build Command: `next build`
+   - Output Directory: `.next`
+   - Install Command: `npm install`
+5. **Important:** Add the following Environment Variable in the Vercel project settings before deploying:
+   - `NEXT_PUBLIC_API_URL`: Set this to your production backend URL (e.g., `https://your-production-backend.com`). Do NOT use `localhost` or `127.0.0.1`.
+6. Click **Deploy**.
+
 ## 🛠️ Additional Built-in Utilities
 
 To maximize efficiency and save on API quotas during interview preparation, this application includes fully built-in, local, keyless utilities:

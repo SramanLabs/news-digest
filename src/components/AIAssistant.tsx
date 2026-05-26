@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Bot, Languages, X, Send, BookOpen } from "lucide-react";
 import Image from "next/image";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<"define" | "translate">("define");
@@ -53,10 +55,9 @@ export default function AIAssistant() {
     setQuery(""); // Clear the input box immediately!
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      let url = `${apiUrl}/api/assistant/define?word=${encodeURIComponent(currentQuery)}`;
+      let url = `${API_URL}/api/assistant/define?word=${encodeURIComponent(currentQuery)}`;
       if (mode === "translate") {
-        url = `${apiUrl}/api/assistant/translate?word=${encodeURIComponent(currentQuery)}&language=${encodeURIComponent(targetLanguage)}`;
+        url = `${API_URL}/api/assistant/translate?word=${encodeURIComponent(currentQuery)}&language=${encodeURIComponent(targetLanguage)}`;
       }
       
       const res = await fetch(url, {

@@ -8,6 +8,8 @@ import TicTacToe from "@/components/games/TicTacToe";
 import Bizdle from "@/components/games/Bizdle";
 import { Flame, Clock, ArrowLeft } from "lucide-react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 interface UserStats {
   email: string;
   streak_days: number;
@@ -23,8 +25,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async (email: string) => {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        const res = await fetch(`${apiUrl}/api/user/stats?email=${encodeURIComponent(email)}`);
+        const res = await fetch(`${API_URL}/api/user/stats?email=${encodeURIComponent(email)}`);
         if (res.ok) {
           const data = await res.json();
           setStats(data);

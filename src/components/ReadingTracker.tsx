@@ -3,6 +3,8 @@
 import { useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 export default function ReadingTracker() {
   const { data: session } = useSession();
   const accumulatedTimeRef = useRef(0);
@@ -10,8 +12,7 @@ export default function ReadingTracker() {
   
   const reportTime = async (seconds: number, email: string) => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      await fetch(`${apiUrl}/api/user/track-time`, {
+      await fetch(`${API_URL}/api/user/track-time`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

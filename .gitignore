@@ -40,14 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-
 __pycache__/
 *.pyc
 *.sqlite3
 *.db
 node_modules/
 .next/
-news-env/
-cat-env/
+backend/news-env/
+backend/__pycache__/
+backend/.env
 .env
 .vscode/

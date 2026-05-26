@@ -5,6 +5,8 @@ import { Article } from "@/types/article";
 import { getLocalDateString } from "@/utils/date";
 import { useSession } from "next-auth/react";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 interface NewsContextType {
   selectedCategory: string;
   selectedDate: string;
@@ -81,8 +83,7 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
     const userEmail = session?.user?.email;
     if (userEmail) {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        await fetch(`${apiUrl}/api/user/read-article`, {
+        await fetch(`${API_URL}/api/user/read-article`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: userEmail, article_id: articleId })
@@ -134,8 +135,7 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     setFetchStatus("Triggering Gemini API News Pipeline...");
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-      const res = await fetch(`${apiUrl}/api/news/trigger-fetch?date=${selectedDate}`, {
+      const res = await fetch(`${API_URL}/api/news/trigger-fetch?date=${selectedDate}`, {
         method: "POST"
       });
       if (!res.ok) throw new Error("Failed to trigger news pipeline");
@@ -147,7 +147,7 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
       const interval = setInterval(async () => {
         attempts++;
         try {
-          const checkUrl = new URL(`${apiUrl}/api/news`);
+          const checkUrl = new URL(`${API_URL}/api/news`);
           checkUrl.searchParams.append("date", selectedDate);
           checkUrl.searchParams.append("limit", "1");
           const checkRes = await fetch(checkUrl.toString());
@@ -193,8 +193,7 @@ export function NewsProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
-        const url = new URL(`${apiUrl}/api/news`);
+        const url = new URL(`${API_URL}/api/news`);
         url.searchParams.append("date", selectedDate);
         if (selectedCategory !== "All") {
           url.searchParams.append("category", selectedCategory);
