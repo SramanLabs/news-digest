@@ -51,11 +51,11 @@ for origin in raw_origins.split(","):
         if o.endswith("/"):
             ALLOWED_ORIGINS.append(o[:-1])
 
-# CORS Configuration
+# CORS Configuration - Bulletproof wildcard setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
@@ -352,4 +352,8 @@ async def reset_database():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    port = int(os.getenv("PORT", 8000))
+    # Disable reload on Render to avoid startup issues
+    is_render = os.getenv("RENDER") is not None
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=not is_render)
