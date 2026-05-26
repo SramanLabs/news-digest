@@ -43,3 +43,21 @@ class UserStatsResponse(BaseModel):
 class MarkReadRequest(BaseModel):
     email: str
     article_id: str
+
+# Pydantic schemas for User Management
+class UserResponse(BaseModel):
+    email: str
+    role: str
+    created_at: str
+
+class AddUserRequest(BaseModel):
+    admin_email: str # Poor man's auth for backend, checked against DB
+    email: str
+    role: str
+
+class UpdateRoleRequest(BaseModel):
+    admin_email: str
+    role: str
+
+class DeleteUserRequest(BaseModel):
+    admin_email: str

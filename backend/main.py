@@ -19,20 +19,39 @@ async def lifespan(app: FastAPI):
     # Run every 60 minutes to preserve Gemini daily quota limits
     scheduler.add_job(fetch_and_store_news, 'interval', minutes=60)
     scheduler.start()
+    
+    # Bootstrap initial admins if DB is empty
+    from database import db
+    try:
+        if db.users.count_documents({}) == 0:
+            import os
+            env_local_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env.local")
+            if os.path.exists(env_local_path):
+                with open(env_local_path, "r") as f:
+                    for line in f.read().splitlines():
+                        if line.startswith("ALLOWED_EMAILS="):
+                            emails = [e.strip() for e in line.split("=", 1)[1].split(",") if e.strip()]
+                            for e in emails:
+                                db.users.insert_one({"email": e, "role": "admin", "created_at": datetime.datetime.utcnow().isoformat()})
+                            logger.info(f"Bootstrapped {len(emails)} admins from .env.local")
+                            break
+    except Exception as e:
+        logger.error(f"Error bootstrapping admins: {e}")
+
     yield
     scheduler.shutdown()
 
 app = FastAPI(title="Sraman's News Digest API", lifespan=lifespan)
 
 import os
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "").split(",") if os.getenv("ALLOWED_ORIGINS") else []
 
 # CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -241,6 +260,82 @@ def mark_article_read(req: schemas.MarkReadRequest, db = Depends(get_db)):
     )
     
     return {"status": "success"}
+
+# --- USER MANAGEMENT / ADMIN ENDPOINTS ---
+
+@app.get("/api/auth/verify")
+def verify_user(email: str, db = Depends(get_db)):
+    if not email:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Email required")
+        
+    user = db.users.find_one({"email": email})
+    if not user:
+        return {"allowed": False, "role": None}
+        
+    return {"allowed": True, "role": user.get("role", "user")}
+
+def _verify_admin(admin_email: str, db):
+    if not admin_email:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    admin_user = db.users.find_one({"email": admin_email})
+    if not admin_user or admin_user.get("role") != "admin":
+        from fastapi import HTTPException
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+@app.get("/api/admin/users", response_model=list[schemas.UserResponse])
+def get_all_users(admin_email: str, db = Depends(get_db)):
+    _verify_admin(admin_email, db)
+    users = []
+    for u in db.users.find().sort("created_at", -1):
+        users.append(schemas.UserResponse(
+            email=u["email"],
+            role=u.get("role", "user"),
+            created_at=u.get("created_at", "")
+        ))
+    return users
+
+@app.post("/api/admin/users")
+def add_user(req: schemas.AddUserRequest, db = Depends(get_db)):
+    _verify_admin(req.admin_email, db)
+    
+    if db.users.find_one({"email": req.email}):
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="User already exists")
+        
+    db.users.insert_one({
+        "email": req.email,
+        "role": req.role,
+        "created_at": datetime.datetime.utcnow().isoformat()
+    })
+    return {"status": "success", "message": f"Added {req.email} as {req.role}"}
+
+@app.put("/api/admin/users/{email}/role")
+def update_user_role(email: str, req: schemas.UpdateRoleRequest, db = Depends(get_db)):
+    _verify_admin(req.admin_email, db)
+    
+    res = db.users.update_one({"email": email}, {"$set": {"role": req.role}})
+    if res.matched_count == 0:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    return {"status": "success", "message": f"Updated {email} role to {req.role}"}
+
+@app.delete("/api/admin/users/{email}")
+def delete_user(email: str, admin_email: str, db = Depends(get_db)):
+    _verify_admin(admin_email, db)
+    
+    if email == admin_email:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+        
+    res = db.users.delete_one({"email": email})
+    if res.deleted_count == 0:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    return {"status": "success", "message": f"Removed {email}"}
 
 @app.delete("/api/admin/reset-database")
 async def reset_database():

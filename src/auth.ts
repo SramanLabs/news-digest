@@ -1,38 +1,48 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 
-// Retrieve allowed emails from environment variable, fallback to an empty array
-const allowedEmails = process.env.ALLOWED_EMAILS 
-  ? process.env.ALLOWED_EMAILS.split(',').map(e => e.trim().toLowerCase()) 
-  : [];
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [Google],
   pages: {
-    signIn: '/login', // Custom login page
-    error: '/login',  // Redirect errors back to our custom login page
+    signIn: '/login',
+    error: '/login',
   },
   callbacks: {
     async signIn({ user, account }) {
       if (account?.provider === "google") {
         const userEmail = user.email?.toLowerCase();
         
-        // If ALLOWED_EMAILS is not set, we can either allow all or deny all.
-        // Given the requirement "predefined static accounts only", we deny if not in list.
-        if (userEmail && allowedEmails.includes(userEmail)) {
-          return true;
-        } else {
-          // Return false to deny sign in
-          return false;
+        if (userEmail) {
+          try {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+            const res = await fetch(`${apiUrl}/api/auth/verify?email=${encodeURIComponent(userEmail)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.allowed) {
+                // Attach role to user object so it can be passed to jwt callback
+                user.role = data.role;
+                return true;
+              }
+            }
+          } catch (error) {
+            console.error("Auth verification failed", error);
+          }
         }
+        return false;
       }
       return false;
     },
-    async session({ session }) {
-      return session;
-    },
-    async jwt({ token }) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.role = user.role;
+      }
       return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token.role) {
+        session.user.role = token.role as string;
+      }
+      return session;
     }
   }
 })

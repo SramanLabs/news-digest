@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Bot, Languages, X, Send, BookOpen } from "lucide-react";
 import Image from "next/image";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
 
 export default function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);

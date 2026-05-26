@@ -118,6 +118,16 @@ export default function Sidebar({ selectedCategory, onSelectCategory }: SidebarP
               {session.user.name?.charAt(0) || "U"}
             </div>
           )}
+          {session.user.role === 'admin' && (
+            <Link 
+              href="/admin"
+              className="flex items-center gap-1.5 text-xs font-black text-amber-500 hover:text-amber-400 uppercase tracking-widest ml-4 transition-colors cursor-pointer"
+              title="Admin Panel"
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Admin
+            </Link>
+          )}
           <Link 
             href="/dashboard"
             className="text-xs font-bold text-theme-muted hover:text-theme-fg uppercase tracking-widest ml-4 transition-colors cursor-pointer"

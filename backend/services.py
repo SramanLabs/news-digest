@@ -48,40 +48,49 @@ def fetch_raw_news(target_date: Optional[datetime.date] = None) -> list:
     all_articles = []
     
     for category, url in rss_feeds.items():
-        feed = feedparser.parse(url)
-        # Extract the top 6 entries from each feed that match target_date or are very fresh (within 1 day of target_date)
-        added_for_category = 0
-        for entry in feed.entries:
-            # Parse the published date
-            pub_date = None
-            if hasattr(entry, 'published_parsed') and entry.published_parsed:
-                try:
-                    pub_date = datetime.date(*entry.published_parsed[:3])
-                except Exception:
-                    pass
-            
-            # Keep articles that are exactly on target_date, or 1 day prior (very fresh)
-            is_fresh = False
-            if pub_date is None:
-                # If no date is available, default to keeping it
-                is_fresh = True
-            else:
-                delta = target_date - pub_date
-                # Within 0 to 1 days (same day or yesterday)
-                if datetime.timedelta(days=0) <= delta <= datetime.timedelta(days=1):
+        try:
+            feed = feedparser.parse(url)
+            # Check for bozo exception (malformed XML or fetch error)
+            if getattr(feed, 'bozo', 0) == 1 and not feed.entries:
+                logger.warning(f"Failed to parse RSS feed for {category} at {url}: {feed.bozo_exception}")
+                continue
+                
+            # Extract the top 6 entries from each feed that match target_date or are very fresh (within 1 day of target_date)
+            added_for_category = 0
+            for entry in feed.entries:
+                # Parse the published date
+                pub_date = None
+                if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                    try:
+                        pub_date = datetime.date(*entry.published_parsed[:3])
+                    except Exception:
+                        pass
+                
+                # Keep articles that are exactly on target_date, or 1 day prior (very fresh)
+                is_fresh = False
+                if pub_date is None:
+                    # If no date is available, default to keeping it
                     is_fresh = True
-            
-            if is_fresh:
-                article = {
-                    "title": entry.title,
-                    "link": entry.link,
-                    "description": entry.description,
-                    "category": category
-                }
-                all_articles.append(article)
-                added_for_category += 1
-                if added_for_category >= 6:
-                    break
+                else:
+                    delta = target_date - pub_date
+                    # Within 0 to 1 days (same day or yesterday)
+                    if datetime.timedelta(days=0) <= delta <= datetime.timedelta(days=1):
+                        is_fresh = True
+                
+                if is_fresh:
+                    article = {
+                        "title": entry.title,
+                        "link": entry.link,
+                        "description": entry.description,
+                        "category": category
+                    }
+                    all_articles.append(article)
+                    added_for_category += 1
+                    if added_for_category >= 6:
+                        break
+        except Exception as e:
+            logger.error(f"Error fetching or parsing RSS feed for {category} at {url}: {e}", exc_info=True)
+            continue
             
     return all_articles
 
@@ -120,10 +129,14 @@ def process_news_with_gemini(raw_news_data: list) -> ArticleList:
             except Exception as e:
                 if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
                     wait_time = 15 * (attempt + 1)
-                    logger.warning(f"Rate limited (429) on {current_model}. Waiting {wait_time}s before falling back to next model...")
+                    logger.warning(f"Transient API rate limit (429/RESOURCE_EXHAUSTED) hit on {current_model}. Waiting {wait_time}s before falling back or retrying...")
+                    time.sleep(wait_time)
+                elif "503" in str(e) or "UNAVAILABLE" in str(e) or "network" in str(e).lower():
+                    wait_time = 10 * (attempt + 1)
+                    logger.warning(f"Transient network error or API unavailability on {current_model}. Waiting {wait_time}s before retrying...")
                     time.sleep(wait_time)
                 else:
-                    logger.error(f"Error processing batch starting at index {i}: {e}", exc_info=True)
+                    logger.error(f"Critical error processing batch starting at index {i} with model {current_model}: {e}", exc_info=True)
                     break
             
         # Sleep to stay well under Gemini's 15 Requests Per Minute free tier limit

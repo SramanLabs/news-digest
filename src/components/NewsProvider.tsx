@@ -5,7 +5,7 @@ import { Article } from "@/types/article";
 import { getLocalDateString } from "@/utils/date";
 import { useSession } from "next-auth/react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL = process.env.NEXT_PUBLIC_API_URL as string;
 
 interface NewsContextType {
   selectedCategory: string;

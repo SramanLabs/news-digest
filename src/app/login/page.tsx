@@ -1,6 +1,5 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { LogIn, Quote } from "lucide-react";
@@ -31,13 +30,12 @@ function LoginContent() {
   const router = useRouter();
   const error = searchParams.get("error");
   const [quote, setQuote] = useState(QUOTES[0]);
-  const [mounted, setMounted] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQuote(QUOTES[Math.floor(Math.random() * QUOTES.length)]);
-    setMounted(true);
-    
+
     // Auto-redirect after 6 seconds if Access Denied
     if (error === "AccessDenied") {
       const timer = setTimeout(() => {
@@ -46,6 +44,68 @@ function LoginContent() {
       return () => clearTimeout(timer);
     }
   }, [error, router]);
+
+  // Use a visibility change listener as a lightweight BFCache reset
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        setIsLoggingIn(false);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pageshow", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pageshow", handleVisibility);
+    };
+  }, []);
+
+  const handleSignIn = async () => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    
+    // Fallback unlock after 3s
+    setTimeout(() => {
+      setIsLoggingIn(false);
+    }, 3000);
+
+    try {
+      // Bypass the next-auth React SDK to avoid its internal concurrency locks getting stuck in BFCache.
+      // We manually fetch the CSRF token and submit the POST form.
+      const res = await fetch("/api/auth/csrf");
+      const { csrfToken } = await res.json();
+      
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = "/api/auth/signin/google";
+      
+      const csrfInput = document.createElement("input");
+      csrfInput.type = "hidden";
+      csrfInput.name = "csrfToken";
+      csrfInput.value = csrfToken;
+      form.appendChild(csrfInput);
+
+      const callbackInput = document.createElement("input");
+      callbackInput.type = "hidden";
+      callbackInput.name = "callbackUrl";
+      callbackInput.value = window.location.origin + "/";
+      form.appendChild(callbackInput);
+
+      document.body.appendChild(form);
+      form.submit();
+      
+      // Cleanup the form so it doesn't linger in the DOM if BFCache restores
+      setTimeout(() => {
+        if (document.body.contains(form)) {
+          document.body.removeChild(form);
+        }
+      }, 100);
+      
+    } catch (err) {
+      console.error("Sign-in failed", err);
+      setIsLoggingIn(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col relative overflow-hidden font-sans selection:bg-cyan-500/30">
@@ -60,15 +120,22 @@ function LoginContent() {
           <Image src="/logo.png" alt="News Digest Logo" width={32} height={32} className="w-8 h-8 rounded-xl shadow-[0_0_20px_rgba(6,182,212,0.4)] object-cover" />
           <span className="tracking-widest bg-clip-text text-transparent bg-gradient-to-r from-white to-stone-400">NEWS Digest</span>
         </div>
-        
+
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
-          className="group relative px-6 py-2.5 rounded-full overflow-hidden flex items-center gap-2 border border-cyan-500/30 hover:border-cyan-400 transition-all bg-black/40 backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] cursor-pointer"
+          type="button"
+          onClick={handleSignIn}
+          className={`group relative px-6 py-2.5 rounded-full overflow-hidden flex items-center gap-2 border border-cyan-500/30 hover:border-cyan-400 transition-all bg-black/40 backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] ${
+            isLoggingIn ? 'opacity-70 cursor-wait' : 'cursor-pointer'
+          }`}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-fuchsia-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-          <LogIn className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300 transition-colors relative z-10" />
+          {isLoggingIn ? (
+            <div className="w-4 h-4 rounded-full border-2 border-cyan-400 border-t-transparent animate-spin relative z-10" />
+          ) : (
+            <LogIn className="w-4 h-4 text-cyan-400 group-hover:text-cyan-300 transition-colors relative z-10" />
+          )}
           <span className="text-sm font-bold text-stone-200 group-hover:text-white transition-colors tracking-widest uppercase relative z-10">
-            Sign In
+            {isLoggingIn ? "Connecting..." : "Sign In"}
           </span>
         </button>
       </header>
@@ -88,7 +155,7 @@ function LoginContent() {
             </div>
           </div>
         ) : (
-          <div className={`transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-12 scale-95'}`}>
+          <div className="login-fade-in">
             <Quote className="w-10 h-10 md:w-14 md:h-14 text-cyan-500/30 mb-8 mx-auto" />
             <h1 className="text-3xl md:text-5xl lg:text-6xl font-light leading-tight md:leading-tight lg:leading-tight text-center mb-12 text-transparent bg-clip-text bg-gradient-to-b from-white via-stone-200 to-stone-500 tracking-tight">
               &ldquo;{quote.text}&rdquo;
