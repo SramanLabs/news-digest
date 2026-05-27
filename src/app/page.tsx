@@ -15,7 +15,7 @@ type Theme = "paper" | "sage" | "alabaster" | "dark";
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [theme, setTheme] = useState<Theme>("paper");
-  
+
   const {
     selectedCategory,
     selectedDate,
@@ -245,7 +245,7 @@ export default function Home() {
                       </div>
                     </div>
                   )}
-                  
+
                   {regularArticles.length > 0 && (
                     <div>
                       {isToday && trendingArticles.length > 0 && (
@@ -309,7 +309,7 @@ export default function Home() {
 
       {/* Floating AI Assistant */}
       <AIAssistant />
-      
+
       {/* Invisible Reading Tracker */}
       <ReadingTracker />
     </div>

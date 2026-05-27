@@ -63,7 +63,7 @@ function LoginContent() {
   const handleSignIn = async () => {
     if (isLoggingIn) return;
     setIsLoggingIn(true);
-    
+
     // Fallback unlock after 3s
     setTimeout(() => {
       setIsLoggingIn(false);
@@ -74,11 +74,11 @@ function LoginContent() {
       // We manually fetch the CSRF token and submit the POST form.
       const res = await fetch("/api/auth/csrf");
       const { csrfToken } = await res.json();
-      
+
       const form = document.createElement("form");
       form.method = "POST";
       form.action = "/api/auth/signin/google";
-      
+
       const csrfInput = document.createElement("input");
       csrfInput.type = "hidden";
       csrfInput.name = "csrfToken";
@@ -93,14 +93,14 @@ function LoginContent() {
 
       document.body.appendChild(form);
       form.submit();
-      
+
       // Cleanup the form so it doesn't linger in the DOM if BFCache restores
       setTimeout(() => {
         if (document.body.contains(form)) {
           document.body.removeChild(form);
         }
       }, 100);
-      
+
     } catch (err) {
       console.error("Sign-in failed", err);
       setIsLoggingIn(false);
@@ -124,9 +124,8 @@ function LoginContent() {
         <button
           type="button"
           onClick={handleSignIn}
-          className={`group relative px-6 py-2.5 rounded-full overflow-hidden flex items-center gap-2 border border-cyan-500/30 hover:border-cyan-400 transition-all bg-black/40 backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] ${
-            isLoggingIn ? 'opacity-70 cursor-wait' : 'cursor-pointer'
-          }`}
+          className={`group relative px-6 py-2.5 rounded-full overflow-hidden flex items-center gap-2 border border-cyan-500/30 hover:border-cyan-400 transition-all bg-black/40 backdrop-blur-md shadow-[0_0_15px_rgba(6,182,212,0.1)] hover:shadow-[0_0_25px_rgba(6,182,212,0.3)] ${isLoggingIn ? 'opacity-70 cursor-wait' : 'cursor-pointer'
+            }`}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-fuchsia-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
           {isLoggingIn ? (
